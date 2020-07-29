@@ -1,5 +1,6 @@
 var https = require('https'), posted = require('./posted.json');
-https.get('https://a.4cdn.org/his/threads.json', res => {
+
+const update = () => https.get('https://a.4cdn.org/his/threads.json', res => {
 		var j = ''
 		res.on('data', c => j += c)
 		res.on('end', () => {
@@ -15,3 +16,5 @@ https.get('https://a.4cdn.org/his/threads.json', res => {
 			}
 		})
 })
+
+setInterval(update, 300_000)  // 5 min.
