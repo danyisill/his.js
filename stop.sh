@@ -4,3 +4,5 @@
 
 PID="$(cat ./.pid)"
 kill "$PID"
+
+echo "Bot killed ($PID)."
