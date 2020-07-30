@@ -1,6 +1,6 @@
 #!/bin/sh
 
-node his.js &
+bash ./his.sh &
 echo "$!" > ./.pid
 
 echo "Bot started."
