@@ -29,7 +29,7 @@ func procThread(th Thread, b string){
 	params.Add("photo", fmt.Sprintf("https://is2.4chan.org/%s/%d%s", b, th.Tim, th.Ext))
 	comment := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(html.UnescapeString(th.Com), "<span class=\"quote\">", ""), "</span>", "\n"), "<br>", "\n"), "class=\"quotelink\"", "")
 	params.Add("caption", fmt.Sprintf("https://boards.4channel.org/%s/thread/%d\n%s\n%s", b, th.No, th.Sub, comment))
-	params.Add("parse_mode", "HTML")
+	//params.Add("parse_mode", "HTML")
 
 	http.Get(fmt.Sprintf("https://api.telegram.org/bot%s/sendPhoto?%s", "1364237567:AAGjywcrfrePt3Of_fGnaXyei4JL7KVa4ZE", params.Encode()))
 }
