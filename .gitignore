@@ -1,2 +1,11 @@
+# Executable
+4ch50replies
+his
+dist*
+
+# Object
+*.o
+*.hi
+
 # Posted files
 posted*
