@@ -1,19 +1,31 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module JSON where
+module JSON ( JsonExpr
+              ( JsonNull   , JsonBool
+              , JsonNumber , JsonString
+              , JsonArray  , JsonObject)
+            , parseJSON
+            , parsePartialJSON) where
+
 -- TODO: Definitely not an up-to-spec JSON parser,
 -- but it should be enough for the 4chan API (maybe).
 
 import Control.Applicative
+import Data.Functor
 import Text.ParserCombinators.ReadP
 
 import Data.Map.Strict (Map)
+import qualified Numeric
 import qualified Data.Map.Strict as Map
 import qualified Data.Char as Char
+
 
 titleCase :: String -> String
 titleCase [] = []
 titleCase (x:xs) = Char.toUpper x : map Char.toLower xs
+
+readHex :: String -> Int
+readHex = fst . head . Numeric.readHex
 
 data JsonExpr
   = JsonNull
@@ -26,52 +38,72 @@ data JsonExpr
 
 -- Parsing `null'
 readNull :: ReadP JsonExpr
-readNull = string "null" >> return JsonNull
+readNull = const JsonNull <$> string "null"
 
 -- Parsing Booleans
 readBool :: ReadP JsonExpr
 readBool = string "true" <|> string "false"
-       >>= return . JsonBool . read . titleCase
+       >>= pure . JsonBool . read . titleCase
 
 -- Parsing numbers
 -- TODO: Deciaml point, hexadecimal, octal, exponent notation, etc.
-digit :: ReadP Char
-digit = satisfy $ (flip elem) ['0'..'9']
+digit :: Int -> ReadP Char
+digit base = digit' where
+  chrOff chr = Char.chr $ Char.ord chr + base
+  digit'
+    | base <= 10 = satisfy $ (flip elem) ['0'..chrOff '9']
+    | base  > 10 = satisfy $ (flip elem)
+        (['0'..'9'] ++ ['a'..chrOff 'a'] ++ ['A'..chrOff 'A'])
 
 readNumber :: ReadP JsonExpr
-readNumber = many1 digit >>= return . JsonNumber . read
+readNumber = JsonNumber . read <$> many1 (digit 10)
 
 -- Parsing strings
--- TODO:
---  - Common escapes not supported (`\n', `\r', `\t', `\b', `\"', etc.).
---  - Hex byte escapes not supported (`\x00`).
---  - Unicode escapes not supported (`\u0000').
---  - And probably more...
 readString :: ReadP JsonExpr
 readString = readQuote
-          >> manyTill (satisfy $ const True) readQuote
-         >>= return . JsonString
-  where readQuote = satisfy (== '"')
-
+          >> JsonString <$> manyTill readCharacters readQuote
+       where readQuote :: ReadP Char
+             readQuote = satisfy (== '"')
+             readCharacters :: ReadP Char
+             readCharacters = do
+               char <- get
+               if char == '\\' then do
+                 escp <- get
+                 case escp of
+                   -- Bytes escape
+                   'u' -> count 4 (digit 16) <&> Char.chr . readHex
+                   'x' -> count 2 (digit 16) <&> Char.chr . readHex
+                   -- Single char
+                   '0' -> pure '\0'
+                   'a' -> pure '\a'
+                   'b' -> pure '\b'
+                   'f' -> pure '\f'
+                   'n' -> pure '\n'
+                   'r' -> pure '\r'
+                   't' -> pure '\t'
+                   'v' -> pure '\v'
+                   c -> pure c  -- \", \', \\, etc.
+               else return char
 -- Parse anything delimitd by a certain string of characters,
 -- and ending by a specific string.
--- TODO: Allow (and ignore) trailing delimitor (e.g [1,2,3,]).
 readDelimited :: forall a. ReadP a -> String -> String -> ReadP [a]
 readDelimited parser delimitor ending = collect [] >>= return . reverse
     where collect :: [a] -> ReadP [a]
           collect vs = do
-            exp <- parser
-            del <- string delimitor <|> string ending
-            if del == ending
-              then return (exp:vs)
-              else do rest <- collect (exp:vs)
-                      return rest
+            end <- option "" (skipSpaces >> string ending)
+            if null end then do
+              expr <- parser
+              deli <- string delimitor <|> string ending
+              if deli == ending
+                then return $ expr:vs
+                else collect (expr:vs)
+            else
+              return vs
 
 -- Parsing JSON arrays
 readArray :: ReadP JsonExpr
 readArray = satisfy (== '[')
-         >> readDelimited parseExpr "," "]"
-        >>= return . JsonArray
+         >> JsonArray <$> readDelimited parseExpr "," "]"
 
 -- Parsing JSON objects
 readPair :: ReadP (String, JsonExpr)
@@ -87,8 +119,8 @@ readPair = do  -- This is only valid within a JSON object.
 
 readObject :: ReadP JsonExpr
 readObject
-  = satisfy (== '{') >> readDelimited readPair "," "}"
-  >>= return . JsonObject . Map.fromList
+   = satisfy (== '{') >> JsonObject . Map.fromList
+                     <$> readDelimited readPair "," "}"
 
 -- Parse any JSON expression
 parseExpr :: ReadP JsonExpr
@@ -105,11 +137,16 @@ parseExpr = spaced readNull
                                  skipSpaces
                                  return expr
 
+parsePartialJSON :: ReadS JsonExpr
+parsePartialJSON s = readP_to_S parseExpr s
+
 -- A return value of Nothing suggests invalid JSON.
 -- (I'm too lazy to do error reporting, it's either valid or not.)
-parse :: String -> Maybe JsonExpr
-parse s = maybeHead [ expr | (expr, "") <- readP_to_S parseExpr s ]
+parseJSON :: String -> Maybe JsonExpr
+parseJSON s = maybeHead [ expr | (expr,"") <- readP_to_S parseExpr s ]
   where maybeHead :: [a] -> Maybe a
         maybeHead [] = Nothing
         maybeHead (x:xs) = Just x
+
+
 
