@@ -23,11 +23,16 @@ fetchReplies board = do
   putStrLn $ "Status:  " ++ show (getResponseStatusCode res)
   putStrLn $ "Content: " ++ show (getResponseHeader "Content-Type" res)
 
-  let jsonString = L8.unpack $ getResponseBody res
-  let json = parseJSON jsonString
+  let resBody :: String
+      resBody = L8.unpack $ getResponseBody res
+
+  let json :: JsonExpr
+      json = read resBody  -- Use `readMaybe` in case of failure.
+
   putStrLn $ show json
 
   return [TelegramMessage "a" "b" "c"]
+
   where catalog :: String
         catalog = "http://a.4cdn.org/" ++ board ++ "/catalog.json"
 
