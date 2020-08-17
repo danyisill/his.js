@@ -4,16 +4,14 @@ module JSON ( JsonExpr
               ( JsonNull   , JsonBool
               , JsonNumber , JsonString
               , JsonArray  , JsonObject)
-            , jsonZero
-            , jsonTrue , jsonFalse
-            , jsonEmptyString
-            , jsonEmptyArray
+            , jsonZero , jsonTrue , jsonFalse
+            , jsonEmptyString , jsonEmptyArray
             , jsonEmptyObject
             , parseJSON
             , parsePartialJSON) where
 
 -- TODO: Definitely not an up-to-spec JSON parser,
--- but it should be enough for the 4chan API (maybe).
+-- but it should be enough for the 4chan API.
 
 import Control.Applicative
 import Data.Functor
@@ -87,22 +85,22 @@ readBool = string "true" <|> string "false"
 -- TODO: Deciaml point, hexadecimal, octal, exponent notation, etc.
 digit :: Int -> ReadP Char
 digit base = digit' where
-  chrOff chr = Char.chr $ Char.ord chr + base
+  chrOff off chr = Char.chr $ Char.ord chr + off - 1
   digit'
-    | base <= 10 = satisfy $ (flip elem) ['0'..chrOff '9']
+    | base <= 10 = satisfy $ (flip elem) ['0' .. chrOff base '0']
     | base  > 10 = satisfy $ (flip elem)
-        (['0'..'9'] ++ ['a'..chrOff 'a'] ++ ['A'..chrOff 'A'])
+        (['0' .. '9'] ++ ['a' .. chrOff (base - 10) 'a']
+                      ++ ['A' .. chrOff (base - 10) 'A'])
 
 readNumber :: ReadP JsonExpr
 readNumber = JsonNumber . read <$> many1 (digit 10)
 
 -- Parsing strings
 readString :: ReadP JsonExpr
-readString
-   = readQuote
-  >> JsonString <$> manyTill readCharacters readQuote
+readString = readQuote
+          >> JsonString <$> manyTill readCharacters readQuote
   where readQuote :: ReadP Char
-        readQuote = satisfy (== '"') <|> satisfy (== '\'')
+        readQuote = satisfy (== '"')
         readCharacters :: ReadP Char
         readCharacters = do
           char <- get
@@ -127,7 +125,7 @@ readString
 -- Parse anything delimitd by a certain string of characters,
 -- and ending by a specific string.
 readDelimited :: forall a. ReadP a -> String -> String -> ReadP [a]
-readDelimited parser delimitor ending = collect [] >>= return . reverse
+readDelimited parser delimitor ending = collect [] <&> reverse
   where collect :: [a] -> ReadP [a]
         collect vs = do
           end <- option "" (skipSpaces >> string ending)
@@ -135,7 +133,7 @@ readDelimited parser delimitor ending = collect [] >>= return . reverse
             expr <- parser
             deli <- string delimitor <|> string ending
             if deli == ending
-              then return $ expr:vs
+              then pure    (expr:vs)
               else collect (expr:vs)
           else return vs
 
@@ -181,7 +179,7 @@ parseExpr
 
 -- Returns successful parses, and the rest of the unparsable JSON (if any).
 parsePartialJSON :: ReadS JsonExpr
-parsePartialJSON s = readP_to_S parseExpr s
+parsePartialJSON = readP_to_S parseExpr
 
 -- Parse a JSON string.
 -- A return value of Nothing suggests invalid JSON,
