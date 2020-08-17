@@ -4,6 +4,11 @@ module JSON ( JsonExpr
               ( JsonNull   , JsonBool
               , JsonNumber , JsonString
               , JsonArray  , JsonObject)
+            , jsonZero
+            , jsonTrue , jsonFalse
+            , jsonEmptyString
+            , jsonEmptyArray
+            , jsonEmptyObject
             , parseJSON
             , parsePartialJSON) where
 
@@ -19,7 +24,7 @@ import qualified Numeric
 import qualified Data.Map.Strict as Map
 import qualified Data.Char as Char
 import Data.List
-import Text.Printf
+import GHC.Float
 
 -- Utility functions
 titleCase :: String -> String
@@ -28,6 +33,13 @@ titleCase (x:xs) = Char.toUpper x : map Char.toLower xs
 
 readHex :: String -> Int
 readHex = fst . head . Numeric.readHex
+
+formatFloat :: RealFloat a => a -> String
+formatFloat f
+  | f == 0                          = "0"
+  | abs f < 1e-6 || abs f > 1e20    = formatRealFloat FFExponent Nothing f
+  | f - fromIntegral (floor f) == 0 = formatRealFloat FFFixed   (Just 0) f
+  | otherwise                       = formatRealFloat FFGeneric  Nothing f
 
 -- Datatype for a JSON parse-tree
 data JsonExpr
@@ -44,7 +56,7 @@ instance Show JsonExpr where
   show JsonNull = "null"
   show (JsonBool True)  = "true"
   show (JsonBool False) = "false"
-  show (JsonNumber n) = printf "%.15G" n
+  show (JsonNumber f) = formatFloat f
   show (JsonString s) = show s
   show (JsonArray  a) = "["  ++ intercalate ", " (map show a) ++  "]"
   show (JsonObject m) = "{ " ++ intercalate ", " pair_strings ++ " }"
@@ -53,6 +65,14 @@ instance Show JsonExpr where
 
 instance Read JsonExpr where
   readsPrec _ = parsePartialJSON
+
+-- Some default values
+jsonZero = JsonNumber 0
+jsonTrue  = JsonBool True
+jsonFalse = JsonBool False
+jsonEmptyString = JsonString ""
+jsonEmptyArray  = JsonArray  []
+jsonEmptyObject = JsonObject Map.empty
 
 -- Parsing `null'
 readNull :: ReadP JsonExpr
