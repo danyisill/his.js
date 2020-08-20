@@ -21,7 +21,7 @@ import Data.Map.Strict (Map)
 import qualified Numeric
 import qualified Data.Map.Strict as Map
 import qualified Data.Char as Char
-import Data.List
+import Data.List (intercalate)
 import GHC.Float
 
 -- Utility functions

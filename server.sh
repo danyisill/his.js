@@ -9,7 +9,8 @@ done
 ./build.sh 4ch50replies
 
 for (( ; ; )); do
-	./4ch50replies his lit
+	./4ch50replies "${boards[@]}"
+	echo "Finsihed, sleeping."
 	sleep 300  # 5 min.
 done
 

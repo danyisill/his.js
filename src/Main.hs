@@ -7,8 +7,9 @@ import JSON
 import Boards
 import Tests
 
-import Control.Monad (when, forM_)
+import Control.Monad (when, unless, forM_)
 import Data.Maybe (fromMaybe)
+import Data.List (intercalate)
 import Data.Set (Set, insert, member)
 import qualified Data.Set as Set
 
@@ -16,6 +17,7 @@ data CommandFlag = Verbose
                  | RunTests
                  | DebugMode
                  | Board String
+                 | Unknown String
                  deriving (Eq, Ord)
 
 collectFlags :: IO (Set CommandFlag)
@@ -27,6 +29,7 @@ collectFlags = collect Set.empty <$> getArgs
             "-v"      -> Verbose
             "--test"  -> RunTests
             "--debug" -> DebugMode
+            '-':opt   -> Unknown opt
             board     -> Board arg
           in collect (insert flag set) args
 
@@ -37,6 +40,13 @@ main = do
     $ putStrLn "[!!] No API token found."
 
   args <- collectFlags
+
+  let unknown = [ opt | Unknown opt <- Set.toList args ]
+  unless (null unknown) $ do
+    putStrLn $ "Unknwon option(s): "
+            ++ intercalate ", " (map ('-':) unknown)
+    exitWith $ ExitFailure 1
+
   when (RunTests `member` args) $ do
     tests <- runTests
     putStrLn $ "All tests passed: " ++ show tests
