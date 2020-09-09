@@ -2,17 +2,20 @@
 
 module Boards (fetchReplies, sendMessages) where
 
+-- TODO: Post Telegram messages in `sendMessages`.
+
+import Control.Monad (forM_)
+import qualified Data.Map.Strict as Map
+
 import JSON
 import EscapeHTML
-
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 
 import Network.HTTP.Simple  -- Dependency.
 import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.Maybe (fromMaybe)
 import Numeric
 
+showFFixed :: RealFloat a => a -> String
 showFFixed f = showFFloat (Just 0) f ""
 
 data TelegramMessage = TelegramMessage
@@ -34,10 +37,12 @@ fetchReplies board = do
       resBody = L8.unpack $ getResponseBody res
 
   let json :: JsonExpr
-      json = read resBody  -- Use `readMaybe` in case of failure.
+      json = read resBody  -- Maybe use `readMaybe` in case of failure.
 
   let (JsonArray pages) = json
   let messages = concat $ map distil pages
+
+  putStrLn $ "Found " ++ show (length messages) ++ " messages worth sending."
 
   return messages
 
@@ -48,8 +53,8 @@ fetchReplies board = do
         fiftyOrMore (JsonObject thread) = let
           replies = Map.lookup "replies" thread
           in case replies of
-            Just (JsonNumber n) -> n > 50
-            Nothing             -> False
+            Just (JsonNumber n) -> n > 50 -- OP counts as a reply.
+            _                   -> False
         fiftyOrMore _ = False
 
         formMessage :: JsonExpr -> TelegramMessage
@@ -65,17 +70,28 @@ fetchReplies board = do
 
           url = "https://boards.4channel.org/"
                 ++ board ++ "/thread/" ++ showFFixed no
-          caption = url ++ "\n" ++ escapeHTML (sub ++ "\n" ++ com)
-          media = "https://is2.4chan.org/" ++ board ++ "/"
+          html = parseManyHTML (sub ++ "\n" ++ com)
+          caption' = url ++ "\n" ++ escapeHTML html
+          media' = "https://is2.4chan.org/" ++ board ++ "/"
                   ++ showFFixed tim ++ ext
-          channel = "@" ++ board ++ "50replies"
-          in TelegramMessage caption media channel
+          channel' = "@" ++ board ++ "50replies"
+          in TelegramMessage caption' media' channel'
+        formMessage _ = error "Expected thread as JSON object."
 
         distil :: JsonExpr -> [TelegramMessage]
         distil (JsonObject page) = let
           Just (JsonArray threads) = Map.lookup "threads" page
           relevant = filter fiftyOrMore threads
           in map formMessage relevant
+        distil _ = error "Expected page as JSON object."
+
+sendMessage :: TelegramMessage -> IO ()
+sendMessage msg = do
+  putStrLn "==== --- ===="
+  putStrLn $ caption msg
+  putStrLn "==== --- ===="
 
 sendMessages :: [TelegramMessage] -> IO ()
-sendMessages msgs = return ()  -- NOP
+-- ^ Sends messages with the message and channel specifed
+--   within  the messages passed in.
+sendMessages messages = forM_ messages sendMessage

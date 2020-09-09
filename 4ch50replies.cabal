@@ -1,0 +1,19 @@
+cabal-version: >= 1.2
+
+name:           4ch50replies
+version:        0.1.0
+license:        GPL-3
+license-file:   LICENSE
+build-type:     Simple
+
+executable 4ch50replies
+  extensions: DoAndIfThenElse
+  main-is: Main.hs
+  hs-source-dirs: app
+  other-modules: Boards JSON EscapeHTML Util Tests
+  build-depends:
+    base,
+    http-conduit,
+    containers,
+    bytestring
+  ghc-options: -Wall -threaded

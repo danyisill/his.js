@@ -1,6 +1,18 @@
 #!/bin/sh
 
-OUT="4ch50replies"
-[ -n "$1" ] && OUT="$1"
+PROF="-prof -fprof-auto -fprof-cafs"
+OPTS="-dynamic -Wall -threaded" # $PROF"
 
-ghc -dynamic -threaded -isrc src/Main.hs --make -o "$OUT"
+OUT="4ch50replies"
+CLEAN=false
+for arg; do
+	[ "$arg" = clean ] && { CLEAN=true; break; }
+	OUT="$arg"
+done
+
+if "$CLEAN"; then
+	rm -fr ./**/*.hi ./**/*.o
+	exit 0
+fi
+
+ghc $OPTS -iapp app/Main.hs --make -o "$OUT"

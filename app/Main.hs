@@ -3,7 +3,6 @@ module Main where
 import System.Environment
 import System.Exit
 
-import JSON
 import Boards
 import Tests
 
@@ -30,7 +29,7 @@ collectFlags = collect Set.empty <$> getArgs
             "--test"  -> RunTests
             "--debug" -> DebugMode
             '-':opt   -> Unknown opt
-            board     -> Board arg
+            board     -> Board board
           in collect (insert flag set) args
 
 main :: IO ()
@@ -54,5 +53,5 @@ main = do
 
   let boards = [ b | Board b <- Set.toList args ]
 
-  forM_ boards
-    $ \board -> sendMessages <$> fetchReplies board
+  -- Fetch replies for each board and send messages.
+  forM_ boards $ (sendMessages =<<) . fetchReplies

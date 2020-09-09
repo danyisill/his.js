@@ -3,6 +3,10 @@
 his
 dist*
 
+# Cabal and Stack
+*.lock
+*-work*
+
 # Object
 *.dyn*
 *.o
